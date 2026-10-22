@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BBapp | Online Booking for UK Barbers</title>
+  <meta name="description" content="BBapp is the online booking system built for UK barbershops. Free website, no-show protection, automatic waitlists and Google review boosts.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <span>Looking for a trim? <a href="book.html">Find a barber near you</a></span>
+  </div>
+
+  <header class="nav">
+    <a class="logo" href="#">BB<span>app</span></a>
+    <nav>
+      <a href="book.html">Book a haircut</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#" class="muted" data-auth="login" id="nav-login">Log in</a>
+      <a href="#" class="btn btn-sm" data-auth="signup" id="nav-start">Get started</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Built for barbers across the UK</p>
+        <h1>Run your shop.<br>Not your diary.</h1>
+        <p class="lead">Take bookings around the clock, stop losing money to no-shows and get your own website — set up over a brew.</p>
+        <a href="#" class="btn" data-auth="signup">Create my free site</a>
+        <p class="small">No card needed. Cancel whenever.</p>
+        <p class="trust">★★★★★ &nbsp;Used by barbers in the UK</p>
+      </div>
+      <figure class="hero-photo">
+        <img src="img/hero-fade.jpg" alt="A barber finishing a skin fade on a smiling client in a British barbershop" width="1600" height="1195">
+        <div class="hero-card" aria-hidden="true">
+        <div class="slot head">Saturday 14:00 – Tom's Chair</div>
+        <div class="slot"><b>14:00</b> Skin fade <em>£22</em></div>
+        <div class="slot"><b>14:30</b> Beard trim <em>£12</em></div>
+        <div class="slot filled"><b>15:00</b> Cancelled → refilled from waitlist</div>
+        <div class="slot"><b>15:30</b> Kids' cut <em>£14</em></div>
+      </div>
+      </figure>
+    </section>
+
+    <section class="features">
+      <h2>Everything a busy chair needs</h2>
+      <div class="grid">
+        <article><h3>Bookings while you sleep</h3><p>Set your hours once. Clients book themselves — and walk-ins still slot in around them.</p><p class="stat">Most online bookings land after the shop has shut.</p></article>
+        <article><h3>A website, included</h3><p>Every plan comes with a mobile-friendly site in your colours. Already have one? Drop in our booking button.</p></article>
+        <article><h3>Waitlist that fills gaps</h3><p>When someone cancels, the next person waiting gets a text and the slot is rebooked automatically.</p></article>
+        <article><h3>No-show protection</h3><p>Take a deposit or the full amount up front via card, Apple Pay or Google Pay. Paid out in pounds to your UK bank.</p></article>
+        <article><h3>More Google reviews</h3><p>Happy clients are nudged to post their five stars on Google, lifting you up local search.</p></article>
+        <article><h3>Your own app</h3><p>A branded app on the App Store and Google Play so regulars can rebook in two taps.</p></article>
+      </div>
+    </section>
+
+    <section class="split">
+      <img class="feature-img" src="img/owner-tablet.jpg" alt="A barbershop owner checking the day's appointments on a tablet at the front counter" width="1600" height="1195" loading="lazy">
+      <div>
+        <p class="eyebrow">Your shop, in your hand</p>
+        <h2>See the whole week at a glance</h2>
+        <p class="lead">Every barber, every booking, colour-coded. Client wants to move? Drag it to the new time and they're emailed straight away.</p>
+        <a href="#" class="btn" data-auth="signup">Create my free site</a>
+      </div>
+    </section>
+
+    <section class="find" id="find">
+      <h2>Need a cut?</h2>
+      <form class="finder" onsubmit="event.preventDefault(); findBarber();">
+        <label for="postcode">Enter your postcode</label>
+        <div class="row">
+          <input id="postcode" placeholder="e.g. M1 1AE" autocomplete="postal-code">
+          <button class="btn" type="submit">Search</button>
+        </div>
+        <p id="finder-msg" class="small" role="status"></p>
+      </form>
+      <div id="results" class="results"></div>
+    </section>
+
+    <section class="pricing" id="pricing">
+      <h2>Simple pricing, in pounds</h2>
+      <div class="toggle">
+        <label><input type="checkbox" id="vat-toggle"> Show prices inc. VAT</label>
+      </div>
+      <div class="plans">
+        <div class="plan"><h3>Solo</h3><p class="price" data-net="19"></p><p>One barber, unlimited bookings, free website.</p></div>
+        <div class="plan featured"><h3>Shop</h3><p class="price" data-net="39"></p><p>Up to 5 chairs, waitlist, deposits, SMS reminders.</p></div>
+        <div class="plan"><h3>Group</h3><p class="price" data-net="79"></p><p>Multiple sites, branded app, reporting.</p></div>
+      </div>
+      <p class="small" id="vat-note">All prices exclude VAT at 20%.</p>
+    </section>
+
+    <section class="quotes">
+      <h2>What barbers say</h2>
+      <div class="grid">
+        <blockquote>"Saturdays used to be phone-in-one-hand chaos. Now the diary just fills itself."<cite>— Shop owner, Leeds</cite></blockquote>
+        <blockquote>"Deposits sorted our no-shows inside a month."<cite>— Barber, Cardiff</cite></blockquote>
+        <blockquote>"Three shops, one calendar. Couldn't go back."<cite>— Group owner, Glasgow</cite></blockquote>
+      </div>
+      <p class="small">Illustrative demo testimonials.</p>
+    </section>
+
+    <img class="banner-img" src="img/tools.jpg" alt="" width="1600" height="893" loading="lazy">
+    <section class="cta" id="start">
+      <h2>Your new diary is a few clicks away</h2>
+      <p>Win back your evenings and grow your takings.</p>
+      <a href="#" class="btn" data-auth="signup">Create my free site</a>
+    </section>
+  </main>
+
+  <footer>
+    <div><a class="logo" href="#">BB<span>app</span></a><p>0161 496 0000 · hello@bbapp.example</p></div>
+    <nav><a href="#">Cookie policy</a><a href="#">Terms</a><a href="#">Privacy (UK GDPR)</a></nav>
+    <p class="small">Demo site. BBapp Ltd is a fictional company registered in England &amp; Wales.</p>
+  </footer>
+
+  <div class="cookie" id="cookie">
+    <p>We use essential cookies to make this site work. With your permission we'd also like analytics cookies. <a href="#">Cookie policy</a></p>
+    <div><button class="btn btn-sm ghost" data-consent="reject">Reject non-essential</button><button class="btn btn-sm" data-consent="accept">Accept all</button></div>
+  </div>
+
+  <div id="booking" class="modal" hidden></div>
+  <div id="auth" class="modal" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="booking.js"></script>
+  <script src="possopay.js"></script>
+  <script src="shop.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

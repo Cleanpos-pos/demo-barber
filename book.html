@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a Haircut | BBapp</title>
+  <meta name="description" content="Find a barber near you anywhere in the UK and book your next cut in a few taps with BBapp.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="logo" href="index.html">BB<span>app</span></a>
+    <nav>
+      <a href="index.html">For barbers</a>
+      <a href="index.html#pricing">Pricing</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="book-hero">
+      <div class="book-copy">
+        <p class="eyebrow">For clients</p>
+        <h1>Your next cut, booked in a few taps.</h1>
+        <p class="lead">Find a barber near you, pick your barber and a time that suits, and you're done. No calls, no waiting on hold.</p>
+
+        <form class="finder light" id="book-finder">
+          <label for="pc">Where are you?</label>
+          <div class="row">
+            <input id="pc" placeholder="Postcode, e.g. LS1 4AP" autocomplete="postal-code" required>
+            <button class="btn" type="submit">Find barbers</button>
+          </div>
+          <p id="book-msg" class="small" role="status"></p>
+        </form>
+        <div id="results" class="results light"></div>
+
+        <div class="app-cta">
+          <div id="qr" class="qr" aria-label="QR code to open this page on your phone"></div>
+          <div>
+            <b>On your computer?</b>
+            <p class="small">Scan to open BBapp on your phone. Our iPhone and Android apps are on the way.</p>
+            <div class="stores"><span class="store">App Store · coming soon</span><span class="store">Google Play · coming soon</span></div>
+          </div>
+        </div>
+      </div>
+      <figure class="book-photo">
+        <img src="img/book-phone.jpg" alt="A man on a UK high street booking a haircut on his phone outside a barbershop" width="1600" height="2000">
+      </figure>
+    </section>
+
+    <section class="steps3">
+      <article><span>1</span><h3>Find</h3><p>Enter your postcode to see barbers near you, nearest first.</p></article>
+      <article><span>2</span><h3>Choose</h3><p>Pick your cut, your favourite barber and a time that works.</p></article>
+      <article><span>3</span><h3>Relax</h3><p>You'll get an email to confirm, and another if anything changes.</p></article>
+    </section>
+  </main>
+
+  <footer>
+    <div><a class="logo" href="index.html">BB<span>app</span></a><p>Online booking for UK barbers</p></div>
+    <nav><a href="#">Cookie policy</a><a href="#">Terms</a><a href="#">Privacy (UK GDPR)</a></nav>
+  </footer>
+
+  <div id="booking" class="modal" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <script src="booking.js"></script>
+  <script src="possopay.js"></script>
+  <script src="shop.js"></script>
+  <script>
+    (() => {
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+      const msg = document.getElementById('book-msg');
+      const list = document.getElementById('results');
+      try { new QRCode(document.getElementById('qr'), { text: location.href.split('#')[0], width: 112, height: 112, colorDark: '#121212', colorLight: '#ffffff' }); } catch {}
+
+      document.getElementById('book-finder').onsubmit = async e => {
+        e.preventDefault();
+        const pc = document.getElementById('pc').value.trim().toUpperCase();
+        msg.textContent = 'Searching…'; list.innerHTML = '';
+        try {
+          const shops = await BBapp.nearestShops(pc);
+          msg.textContent = shops.length ? `Barbers nearest ${pc}` : 'No barbers on BBapp near you yet.';
+          list.innerHTML = shops.slice(0, 8).map(s => `
+            <div class="shop">
+              <div><b>${esc(s.name)}</b><span>${esc(s.address || '')} · ${esc(s.postcode)}</span></div>
+              <span class="dist">${s.miles.toFixed(1)} mi</span>
+              <button class="btn btn-sm ghost" data-store="${s.id}">Shop</button>
+              <button class="btn btn-sm" data-shop="${s.id}">Book</button>
+            </div>`).join('');
+        } catch (err) { msg.textContent = err.message; }
+      };
+      list.onclick = e => {
+        const id = e.target.closest('[data-shop]')?.dataset.shop; if (id) BBapp.openBooking(id);
+        const store = e.target.closest('[data-store]')?.dataset.store; if (store) BBapp.openShop(store);
+      };
+    })();
+  </script>
+</body>
+</html>

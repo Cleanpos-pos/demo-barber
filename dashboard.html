@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BBapp Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="logo" href="index.html">BB<span>app</span></a>
+    <nav>
+      <span id="who" class="small"></span>
+      <a href="#" id="logout" class="btn btn-sm ghost">Log out</a>
+    </nav>
+  </header>
+
+  <main class="dash wide">
+    <p id="dash-msg" role="status">Loading…</p>
+    <section id="dash" hidden>
+      <h1 id="shop-name"></h1>
+      <p class="small" id="shop-addr"></p>
+
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="calendar" aria-selected="true">Calendar</button>
+        <button role="tab" data-tab="staff">Staff &amp; clock</button>
+        <button role="tab" data-tab="payments">Payments</button>
+        <button role="tab" data-tab="integrations">Integrations</button>
+        <button role="tab" data-tab="services">Services</button>
+        <button role="tab" data-tab="shop">Shop</button>
+      </nav>
+
+      <div data-panel="calendar"></div>
+      <div data-panel="staff" hidden></div>
+      <div data-panel="payments" hidden></div>
+      <div data-panel="integrations" hidden></div>
+      <div data-panel="services" hidden></div>
+      <div data-panel="shop" hidden></div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" hidden></div>
+  <div id="sheet" class="modal" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="booking.js"></script>
+  <script src="auth.js"></script>
+  <script src="possopay.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="calendar.js"></script>
+  <script src="staff.js"></script>
+  <script src="payments.js"></script>
+  <script src="services.js"></script>
+  <script src="shopadmin.js"></script>
+</body>
+</html>

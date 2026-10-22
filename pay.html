@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>BBapp Pay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="pay-page">
+  <main class="pay-card" id="pay">
+    <p class="small">Loading…</p>
+  </main>
+  <p class="small pay-foot">Secure card payment by Posso Pay · <a href="index.html">BB<b>app</b></a></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="possopay.js"></script>
+  <script>
+    // Public pay page, like ios PayLinkPage: reads the link, never writes its
+    // status — the Posso Pay webhook marks it paid.
+    (async () => {
+      const cfg = window.BBAPP_CONFIG;
+      const db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+      const el = document.getElementById('pay');
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+      const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      const { data } = id && /^[0-9a-f-]{36}$/i.test(id) ? await db.rpc('bbapp_get_pay_link', { p_id: id }) : { data: [] };
+      const link = data?.[0];
+      if (!link) { el.innerHTML = '<h1>Link not found</h1><p>Please check the link, or ask the shop to send a new one.</p>'; return; }
+
+      const head = `<p class="small">${esc(link.shop_name)}</p><h1>${gbp.format(link.amount_pence / 100)}</h1><p>${esc(link.description)}</p>`;
+      if (link.status === 'paid') { el.innerHTML = `${head}<p class="paid">✓ Paid — thank you!</p>`; return; }
+      if (link.status !== 'pending') { el.innerHTML = `${head}<p>This link is no longer active. Please contact ${esc(link.shop_name)}.</p>`; return; }
+      if (params.get('payment') === 'success') { el.innerHTML = `${head}<p class="paid">Thanks — your payment is being confirmed.</p>`; return; }
+
+      el.innerHTML = `${head}${params.get('payment') === 'cancel' ? '<p class="small">Payment cancelled. You can try again.</p>' : ''}
+        <button class="btn" id="go">Pay ${gbp.format(link.amount_pence / 100)} by card</button><p id="err" class="small" role="status"></p>`;
+      document.getElementById('go').onclick = async e => {
+        e.target.disabled = true;
+        const back = `${location.origin}${location.pathname}?id=${link.id}`;
+        try {
+          const intent = await PossoPay.createOnlinePaymentIntent(link.shop_id, {
+            amount: link.amount_pence, description: link.description, customer_reference: link.id,
+            embed_parent_origin: location.origin, return_url: `${back}&payment=success`, success_url: `${back}&payment=success`,
+            cancel_url: `${back}&payment=cancel`, customer: { name: link.customer_name || undefined },
+            metadata: { tenant_id: link.shop_id, source: 'online', channel: 'bbapp_pay_link', pay_link_id: link.id },
+          });
+          if (!intent.embed_url) throw new Error('Payment page unavailable — please try again.');
+          location.href = intent.embed_url;
+        } catch (err) {
+          document.getElementById('err').textContent = err.message;
+          e.target.disabled = false;
+        }
+      };
+    })();
+  </script>
+</body>
+</html>
