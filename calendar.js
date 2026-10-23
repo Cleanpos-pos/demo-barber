@@ -58,7 +58,7 @@ BBdash.tab('calendar', panel => {
       barbers.length ? null : db.rpc('bbapp_public_barbers', { p_shop: shop.id }),
       schedule.length ? null : db.from('BBapp-settings').select('opening_hours').eq('shop_id', shop.id).single(),
       db.from('BBapp-bookings')
-        .select('*, service:"BBapp-services"(name, price_pence)')
+        .select('*, service:"BBapp-services"(name, price_pence), client:"BBapp-clients"(id, preferences)')
         .eq('shop_id', shop.id).gte('date', isoDate(ds[0])).lte('date', isoDate(ds[ds.length - 1]))
         .not('status', 'in', '(cancelled)').order('time'),
     ]);
@@ -113,7 +113,7 @@ BBdash.tab('calendar', panel => {
       return `<div class="bk st-${b.status}" data-id="${b.id}" tabindex="0"
           style="top:${top}px;height:${h - 2}px;left:calc(${lane * 100 / lanes}% + 2px);width:calc(${100 / lanes}% - 4px);--c:${esc(bar?.color_code || '#666')}"
           title="${b.time}–${end} ${esc(b.guest_name)} · ${esc(b.service?.name || '')} · ${esc(nameOf(bar))}">
-          <b>${b.time}–${end}</b><span>${esc(b.guest_name)}</span><span class="svc">${esc(b.service?.name || '')}${mode === 'week' ? ' · ' + esc(nameOf(bar)) : ''}</span>
+          <b>${b.time}–${end}${b.client?.preferences || b.notes ? ' <i class="note-flag" title="Has notes">📝</i>' : ''}</b><span>${esc(b.guest_name)}</span><span class="svc">${esc(b.service?.name || '')}${mode === 'week' ? ' · ' + esc(nameOf(bar)) : ''}</span>
         </div>`;
     }).join('');
   }
@@ -206,11 +206,23 @@ BBdash.tab('calendar', panel => {
       <p class="small">${new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, ${b.time}–${end}</p>
       <p>${esc(b.service?.name || '')}${b.service ? ' · ' + BBdash.gbp.format(b.service.price_pence / 100) : ''} with <b>${esc(nameOf(bar))}</b></p>
       <p class="small">${[b.guest_phone, b.guest_email].filter(Boolean).map(esc).join(' · ')}</p>
+      ${b.notes ? `<div class="note-box"><b>This visit</b><p>${esc(b.notes)}</p></div>` : ''}
+      ${b.client ? `<div class="note-box prefs-box"><b>Client preferences</b>
+        <textarea id="pref-edit" rows="2" maxlength="500" placeholder="No preferences saved yet">${esc(b.client.preferences || '')}</textarea>
+        <button class="btn btn-sm ghost" id="pref-save">Save preferences</button></div>` : ''}
       <p><span class="tag ${b.status}">${b.status.replace('_', '-')}</span></p>
-      <div class="chips">${(NEXT[b.status] || []).map(s => `<button data-status="${s}">${LABEL[s]}</button>`).join('')}
+      <div class="chips">${b.status !== 'cancelled' && b.status !== 'no_show' && BBdash.takePayment ? '<button data-pay class="primary-chip">Take payment</button>' : ''}
+        ${(NEXT[b.status] || []).map(s => `<button data-status="${s}">${LABEL[s]}</button>`).join('')}
         ${b.service && BBdash.createPayLink ? '<button data-paylink>Send pay link</button>' : ''}</div>
       <details><summary class="small">History</summary><ul class="small">${b.communication_history.map(h => `<li>${esc(h)}</li>`).join('')}</ul></details>`);
     sheet.onclick = async e => {
+      if (e.target.closest('#pref-save')) {
+        const prefs = sheet.querySelector('#pref-edit').value.trim() || null;
+        const { error } = await db.from('BBapp-clients').update({ preferences: prefs, preferences_updated_at: new Date().toISOString() }).eq('id', b.client.id);
+        if (error) return toast(error.message, true);
+        b.client.preferences = prefs; render(); return toast('Preferences saved');
+      }
+      if (e.target.closest('[data-pay]')) { BBdash.closeSheet(); return BBdash.takePayment(b, barberOf(b.chair_id), load); }
       if (e.target.closest('[data-paylink]')) {
         BBdash.closeSheet();
         return BBdash.createPayLink({ amount_pence: b.service.price_pence, description: `${b.service.name} at ${shop.name}`, customer_name: b.guest_name, customer_phone: b.guest_phone, customer_email: b.guest_email, booking_id: b.id });

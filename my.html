@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>My Booking | BBapp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="my-page">
+  <header class="nav"><a class="logo" href="book.html">BB<span>app</span></a><button class="btn btn-sm ghost" id="notify-btn" hidden>Turn on alerts</button></header>
+  <main class="my-wrap" id="my"><p class="small">Loading…</p></main>
+  <div id="toast" role="status" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="analytics.js"></script>
+  <script>
+    // Client "My booking" page: the in-app inbox for reminders, waitlist offers
+    // and updates. Opened from the private link in booking emails; the token is
+    // remembered on this device so it works like an app.
+    (() => {
+      const cfg = window.BBAPP_CONFIG;
+      const db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+      const el = document.getElementById('my');
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+      const day = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }); };
+      const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString('en-GB'); };
+      const toast = (t, bad) => { const x = document.getElementById('toast'); x.textContent = t; x.className = bad ? 'bad' : ''; x.hidden = false; setTimeout(() => { x.hidden = true; }, 3500); };
+
+      const qs = new URLSearchParams(location.search).get('t');
+      let token = qs;
+      try { if (qs) localStorage.setItem('bbapp-my-token', qs); else token = localStorage.getItem('bbapp-my-token'); } catch {}
+      if (!token || !/^[0-9a-f-]{36}$/i.test(token)) {
+        el.innerHTML = '<h1>My booking</h1><p>Open the link in your booking email to see your appointments and alerts here.</p><a class="btn" href="book.html">Book a haircut</a>';
+        return;
+      }
+
+      let seen = new Set(), first = true;
+      const ACTION = {
+        claim: ['Grab this slot', 'btn'], decline: ['No thanks', 'btn ghost'],
+        coming: ["Yes, I'm coming", 'btn'], cant_make_it: ["No, can't make it", 'btn ghost'],
+      };
+
+      async function load() {
+        const { data, error } = await db.rpc('bbapp_client_feed', { p_token: token });
+        if (error || !data) { el.innerHTML = '<h1>Link not recognised</h1><p>Please use the latest link from your booking email.</p>'; return; }
+        // Pop a system notification for anything new while the page is open.
+        for (const n of data.notifications) {
+          if (!seen.has(n.id) && !first && n.status === 'unread' && 'Notification' in window && Notification.permission === 'granted') {
+            try { new Notification(n.title, { body: n.body, tag: n.id }); } catch {}
+          }
+          seen.add(n.id);
+        }
+        first = false;
+        const open = data.notifications.filter(n => n.actions.length && n.status !== 'done');
+        el.innerHTML = `
+          <p class="eyebrow">${esc(data.shop.name)}</p>
+          <h1>My booking</h1>
+          ${open.map(n => `
+            <div class="alert-card ${n.kind}">
+              <b>${esc(n.title)}</b><p>${esc(n.body)}</p>
+              <div class="inline">${n.actions.map(a => `<button class="${ACTION[a][1]}" data-act="${a}" data-token="${n.token}">${ACTION[a][0]}</button>`).join('')}</div>
+            </div>`).join('')}
+          <h2>Upcoming</h2>
+          <div class="list">${data.bookings.length ? data.bookings.map(b => `
+            <div class="row-item"><div><span><b>${day(b.date)}, ${b.time}</b></span>
+              <span class="small">${esc(b.service || '')}${b.barber ? ' with ' + esc(b.barber) : ''}</span></div>
+              <span class="tag ${b.status}">${b.status === 'pending' ? 'requested' : b.status}</span>
+              ${['pending', 'confirmed'].includes(b.status) ? `<button class="btn btn-sm ghost" data-act="cant_make_it" data-token="${b.token}">Cancel</button>` : ''}
+            </div>`).join('') : '<p class="small">No upcoming bookings.</p>'}</div>
+          ${data.waitlist.length ? `<h2>Waitlist</h2><div class="list">${data.waitlist.map(w => `
+            <div class="row-item"><div><span>${day(w.date)}, ${w.from}–${w.to}</span><span class="small">${esc(w.service)}</span></div>
+              <span class="tag ${w.status === 'offered' ? 'confirmed' : 'pending'}">${w.status === 'offered' ? `Offered ${w.offer_time}` : 'Waiting'}</span></div>`).join('')}</div>` : ''}
+          <h2>Notifications</h2>
+          <div class="list">${data.notifications.map(n => `
+            <div class="row-item note ${n.status}"><div><span>${esc(n.title)}</span><span class="small">${esc(n.body || '')}</span></div><span class="small">${ago(n.created_at)}</span></div>`).join('') || '<p class="small">Nothing yet.</p>'}</div>
+          <p class="small">${esc(data.shop.name)} · ${esc([data.shop.address, data.shop.postcode].filter(Boolean).join(', '))}${data.shop.phone ? ' · ' + esc(data.shop.phone) : ''}</p>`;
+        db.rpc('bbapp_client_mark_read', { p_token: token });
+      }
+
+      el.addEventListener('click', async e => {
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        const act = b.dataset.act, t = b.dataset.token;
+        if (act === 'cant_make_it' && !confirm('Cancel this booking? Your slot will be offered to someone on the waitlist.')) return;
+        b.disabled = true;
+        const res = act === 'claim' || act === 'decline'
+          ? await db.rpc('bbapp_claim_offer', { p_token: t, p_accept: act === 'claim' })
+          : await db.rpc('bbapp_booking_respond', { p_token: t, p_response: act });
+        if (res.error) { toast(res.error.message, true); b.disabled = false; return load(); }
+        if (act === 'claim' && res.data?.token) { token = res.data.token; try { localStorage.setItem('bbapp-my-token', token); } catch {} }
+        toast({ claim: "You're booked in!", decline: 'No problem.', coming: 'Great — see you soon!', cant_make_it: 'Booking cancelled.' }[act]);
+        load();
+      });
+
+      // Browser alerts while this page is open (true push when closed needs a push service).
+      const nb = document.getElementById('notify-btn');
+      if ('Notification' in window && Notification.permission === 'default') {
+        nb.hidden = false;
+        nb.onclick = async () => { await Notification.requestPermission(); nb.hidden = true; };
+      }
+
+      load();
+      setInterval(load, 20000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    })();
+  </script>
+</body>
+</html>

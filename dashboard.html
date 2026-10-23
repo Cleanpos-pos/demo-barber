@@ -12,6 +12,7 @@
   <header class="nav">
     <a class="logo" href="index.html">BB<span>app</span></a>
     <nav>
+      <button class="bell" id="bell" aria-label="Notifications">🔔<span id="bell-n" hidden></span></button>
       <span id="who" class="small"></span>
       <a href="#" id="logout" class="btn btn-sm ghost">Log out</a>
     </nav>
@@ -25,19 +26,23 @@
 
       <nav class="tabs" role="tablist">
         <button role="tab" data-tab="calendar" aria-selected="true">Calendar</button>
+        <button role="tab" data-tab="reports">Reports</button>
         <button role="tab" data-tab="staff">Staff &amp; clock</button>
         <button role="tab" data-tab="payments">Payments</button>
         <button role="tab" data-tab="integrations">Integrations</button>
         <button role="tab" data-tab="services">Services</button>
         <button role="tab" data-tab="shop">Shop</button>
+        <button role="tab" data-tab="stock">Stock</button>
       </nav>
 
       <div data-panel="calendar"></div>
+      <div data-panel="reports" hidden></div>
       <div data-panel="staff" hidden></div>
       <div data-panel="payments" hidden></div>
       <div data-panel="integrations" hidden></div>
       <div data-panel="services" hidden></div>
       <div data-panel="shop" hidden></div>
+      <div data-panel="stock" hidden></div>
     </section>
   </main>
 
@@ -55,5 +60,9 @@
   <script src="payments.js"></script>
   <script src="services.js"></script>
   <script src="shopadmin.js"></script>
+  <script src="till.js"></script>
+  <script src="reports.js"></script>
+  <script src="stock.js"></script>
+  <script src="notifications.js"></script>
 </body>
 </html>

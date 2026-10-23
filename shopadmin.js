@@ -75,7 +75,15 @@ BBdash.tab('shop', panel => {
         <label>Description<input name="description" value="${esc(p.description || '')}" placeholder="e.g. Strong hold, no shine. 75 ml."></label>
         <div class="inline">
           <label>Price (£)<input name="price" type="number" step="0.01" min="0" required value="${p.price_pence != null ? (p.price_pence / 100).toFixed(2) : ''}"></label>
-          <label>Stock (blank = no limit)<input name="stock" type="number" min="0" step="1" value="${p.stock ?? ''}"></label>
+          <label>Cost price (£)<input name="cost" type="number" step="0.01" min="0" value="${p.cost_pence != null ? (p.cost_pence / 100).toFixed(2) : ''}" placeholder="for margins"></label>
+        </div>
+        <div class="inline">
+          <label>${p.id && p.stock != null ? 'Stock (change it in the Stock tab)' : 'Starting stock (blank = untracked)'}<input name="stock" type="number" min="0" step="1" value="${p.stock ?? ''}" ${p.id && p.stock != null ? 'readonly' : ''}></label>
+          <label>Reorder when at or below<input name="threshold" type="number" min="0" step="1" value="${p.low_stock_threshold ?? 3}"></label>
+        </div>
+        <div class="inline">
+          <label>Supplier<input name="supplier" value="${esc(p.supplier || '')}"></label>
+          <label>SKU / barcode<input name="sku" value="${esc(p.sku || '')}"></label>
         </div>
         <fieldset class="img-pick">
           <legend>Photo</legend>
@@ -110,9 +118,13 @@ BBdash.tab('shop', panel => {
       const row = {
         name: f.get('name').trim(), description: f.get('description').trim() || null,
         price_pence: Math.round(Number(f.get('price')) * 100),
-        stock: f.get('stock') === '' ? null : Number(f.get('stock')),
         image_url: f.get('image_url').trim() || null, active: f.get('active') === 'on',
+        cost_pence: f.get('cost') === '' ? null : Math.round(Number(f.get('cost')) * 100),
+        low_stock_threshold: Number(f.get('threshold') || 0),
+        supplier: f.get('supplier').trim() || null, sku: f.get('sku').trim() || null,
       };
+      // Stock numbers only change through the Stock tab once tracked, so the history stays complete.
+      if (!(p.id && p.stock != null)) row.stock = f.get('stock') === '' ? null : Number(f.get('stock'));
       const { error } = p.id
         ? await db.from('BBapp-products').update(row).eq('id', p.id)
         : await db.from('BBapp-products').insert({ ...row, shop_id: shop.id, sort: products.length + 1 });
@@ -132,8 +144,18 @@ BBdash.tab('shop', panel => {
     if (b.id === 'new-prod') return edit();
     if (b.dataset.edit) return edit(products.find(p => p.id === b.dataset.edit));
     if (b.dataset.order) {
-      const patch = { status: b.dataset.to, ...(b.dataset.to === 'paid' ? { paid_at: new Date().toISOString() } : {}) };
-      const { error } = await db.from('BBapp-orders').update(patch).eq('id', b.dataset.order);
+      const to = b.dataset.to, id = b.dataset.order;
+      if (to === 'paid') {
+        const { data: o } = await db.from('BBapp-orders').select('*').eq('id', id).single();
+        return BBdash.takeOrderPayment(o, loadOrders);
+      }
+      if (to === 'cancelled') {
+        if (!confirm('Cancel this order? Its products go back into stock.')) return;
+        const { error } = await db.rpc('bbapp_cancel_order', { p_order: id });
+        if (error) return toast(error.message, true);
+        loadProducts(); return loadOrders();
+      }
+      const { error } = await db.from('BBapp-orders').update({ status: to }).eq('id', id);
       if (error) return toast(error.message, true);
       loadOrders();
     }

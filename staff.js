@@ -116,6 +116,7 @@ BBdash.tab('staff', panel => {
         <div class="inline">
           <label>Role<select name="role">${['Barber', 'Senior barber', 'Apprentice', 'Manager'].map(r => `<option ${m.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
           <label>Colour<input name="color_code" type="color" value="${esc(m.color_code)}"></label>
+          <label>Commission %<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${m.commission_pct ?? ''}" placeholder="e.g. 50"></label>
           <label>Clock-in PIN<input name="pin_code" inputmode="numeric" pattern="\\d{4,6}" maxlength="6" value="${esc(m.pin_code || '')}" placeholder="4–6 digits" autocomplete="off"></label>
         </div>
         <div class="inline">
@@ -140,6 +141,7 @@ BBdash.tab('staff', panel => {
         display_name: f.get('display_name').trim() || null, role: f.get('role'), color_code: f.get('color_code'),
         pin_code: f.get('pin_code').trim() || null, phone: f.get('phone').trim() || null, email: f.get('email').trim() || null,
         availability: f.get('follow') === 'on' ? null : readAvailability(sheet), is_active: f.get('is_active') === 'on',
+        commission_pct: f.get('commission_pct') === '' ? null : Number(f.get('commission_pct')),
       };
       const res = m.id
         ? await db.from('BBapp-staff').update(row).eq('id', m.id).select().single()

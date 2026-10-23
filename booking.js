@@ -93,6 +93,7 @@ async function openBooking(shopId) {
     shop: shop.data, rules: settings.data.booking_rules, schedule: settings.data.opening_hours,
     chairs, services: services.data, cats: cats.data || [], staffId: '', service: null, date: null, time: null,
   });
+  BBtrack.event('booking_open', { shop_id: shopId });
   const named = [...new Map(chairs.filter(c => c.staff_id).map(c => [c.staff_id, c])).values()];
   const dates = [...Array(state.rules.bookingLeadTimeDays || 28).keys()].map(i => {
     const d = new Date(); d.setDate(d.getDate() + i); return d;
@@ -117,6 +118,9 @@ async function openBooking(shopId) {
         <input name="name" placeholder="Full name" required autocomplete="name">
         <input name="email" type="email" placeholder="Email" required autocomplete="email">
         <input name="phone" type="tel" placeholder="Mobile (07…)" autocomplete="tel">
+        <div id="prefs" class="prefs"></div>
+        <label class="small">Anything else for this visit? (optional)
+          <input name="notes" maxlength="300" placeholder="e.g. running 5 minutes late, bringing my son"></label>
         <button class="btn" type="submit">Confirm booking</button>
       </form>
       <p id="book-msg" role="status"></p>
@@ -127,6 +131,45 @@ async function openBooking(shopId) {
   m.querySelector('#barber')?.addEventListener('click', e => pick(e, 'barber', b => { state.staffId = b.dataset.staff; }));
   m.querySelector('#days').onclick = e => pick(e, 'days', b => { state.date = b.dataset.date; });
   m.querySelector('#guest').onsubmit = submitBooking;
+  const guest = m.querySelector('#guest');
+  state.savedPrefs = null;
+  renderPrefs();
+  guest.email.addEventListener('change', lookupPrefs);
+  guest.name.addEventListener('change', lookupPrefs);
+}
+
+// Standing preferences: new clients are asked once; returning clients see what
+// they told us last time and choose to keep, change or remove it.
+async function lookupPrefs() {
+  const g = document.getElementById('guest');
+  const email = g.email.value.trim(), name = g.name.value.trim();
+  if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+  const { data } = await db.rpc('bbapp_client_prefs', { p_shop: state.shop.id, p_email: email, p_name: name });
+  state.savedPrefs = data?.[0]?.preferences || null;
+  renderPrefs();
+}
+
+function renderPrefs() {
+  const el = document.getElementById('prefs');
+  if (!el) return;
+  if (!state.savedPrefs) {
+    el.innerHTML = `<label class="small">Any preferences or requests for your barber? We'll remember them for next time.
+      <textarea name="preferences" rows="2" maxlength="500" placeholder="e.g. grade 2 on the sides, keep length on top, sensitive skin"></textarea></label>
+      <input type="hidden" name="prefs_action" value="set">`;
+    return;
+  }
+  el.innerHTML = `
+    <p class="small"><b>Last time you told us:</b></p>
+    <blockquote class="saved-prefs">${esc(state.savedPrefs)}</blockquote>
+    <div class="chips" role="radiogroup" aria-label="Your preferences">
+      <label class="chip-radio"><input type="radio" name="prefs_action" value="keep" checked> Keep these</label>
+      <label class="chip-radio"><input type="radio" name="prefs_action" value="set"> Add or change</label>
+      <label class="chip-radio"><input type="radio" name="prefs_action" value="clear"> Remove them</label>
+    </div>
+    <textarea name="preferences" rows="2" maxlength="500" hidden>${esc(state.savedPrefs)}</textarea>`;
+  el.querySelectorAll('[name=prefs_action]').forEach(r => r.onchange = () => {
+    el.querySelector('[name=preferences]').hidden = el.querySelector('[name=prefs_action]:checked').value !== 'set';
+  });
 }
 
 // Services grouped as "Category › Subcategory", uncategorised last.
@@ -172,10 +215,55 @@ async function renderSlots() {
   const day = new Date(y, mo - 1, d), dur = state.service.duration_minutes;
   const open = generateSlots(day, state.schedule, state.rules)
     .filter(t => findFreeChairs(candidateChairs(day, t, dur), busy, t, dur).length);
-  el.innerHTML = open.length
+  el.innerHTML = (open.length
     ? open.map(t => `<button data-time="${t}">${t}</button>`).join('')
-    : '<p class="small">No times left that day — try another.</p>';
-  el.onclick = e => pick(e, 'slots', b => { state.time = b.dataset.time; document.getElementById('guest').hidden = false; });
+    : '<p class="small">No times left that day.</p>') +
+    `<p class="wl-ask small">${open.length ? 'None of these suit?' : 'Would you like to go on the waitlist?'}
+      <button type="button" class="linkish" id="wl-open">Join the waitlist for ${day.toLocaleDateString('en-GB', { weekday: 'long' })}</button> and we'll offer you the first spot that frees up.</p>`;
+  document.getElementById('wl-open').onclick = e => { e.stopPropagation(); openWaitlist(); };
+  el.onclick = e => pick(e, 'slots', b => { state.time = b.dataset.time; document.getElementById('guest').hidden = false;
+    BBtrack.event('slot_select', { shop_id: state.shop.id }); });
+}
+
+// Waitlist: the client picks a time window on the chosen day; if a matching
+// slot frees up (a cancellation or a "can't make it"), it's offered to them.
+function openWaitlist() {
+  const [y, mo, d] = state.date.split('-').map(Number);
+  const dayName = DAYS[new Date(y, mo - 1, d).getDay()];
+  const hours = (state.schedule.find(x => x.dayOfWeek === dayName)?.timeSlots || []);
+  const s = hours.length ? Math.min(...hours.map(w => toMin(w.startTime))) : 540;
+  const e = hours.length ? Math.max(...hours.map(w => toMin(w.endTime))) : 1080;
+  const opts = sel => { let o = ''; for (let m = s; m <= e; m += 30) { const t = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; o += `<option ${t === sel ? 'selected' : ''}>${t}</option>`; } return o; };
+  const fmt = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+  const g = document.getElementById('guest');
+  const box = document.createElement('form');
+  box.id = 'wl-form'; box.className = 'stack wl-form';
+  box.innerHTML = `
+    <h4>Join the waitlist</h4>
+    <p class="small">${esc(state.service.name)}${state.staffId ? ' with ' + esc(state.chairs.find(c => c.staff_id === state.staffId)?.name || '') : ''} on ${new Date(y, mo - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+    <div class="inline"><label class="small">From<select name="from">${opts(fmt(s))}</select></label><label class="small">To<select name="to">${opts(fmt(e))}</select></label></div>
+    <input name="name" placeholder="Full name" required autocomplete="name" value="${esc(g?.name.value || '')}">
+    <input name="email" type="email" placeholder="Email" required autocomplete="email" value="${esc(g?.email.value || '')}">
+    <input name="phone" type="tel" placeholder="Mobile (optional)" autocomplete="tel" value="${esc(g?.phone.value || '')}">
+    <button class="btn">Add me to the waitlist</button>`;
+  document.getElementById('wl-form')?.remove();
+  document.getElementById('slots').after(box);
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  box.onsubmit = async ev => {
+    ev.preventDefault();
+    const f = new FormData(box);
+    const { data: tok, error } = await db.rpc('bbapp_join_waitlist', {
+      p_shop: state.shop.id, p_service: state.service.id, p_staff: state.staffId || null, p_date: state.date,
+      p_from: f.get('from'), p_to: f.get('to'), p_name: f.get('name'), p_email: f.get('email'), p_phone: f.get('phone') || null,
+    });
+    if (error) { document.getElementById('book-msg').textContent = error.message; return; }
+    try { localStorage.setItem('bbapp-my-token', tok); } catch {}
+    document.querySelector('#booking .sheet').innerHTML = `
+      <h3>You're on the waitlist 🕒</h3>
+      <p>If a ${esc(state.service.name)} slot opens between ${f.get('from')} and ${f.get('to')}, we'll alert you on your My booking page — first to tap gets it.</p>
+      <div class="inline"><a class="btn" href="my.html?t=${tok}">Open My booking</a>
+      <button class="btn ghost" onclick="document.getElementById('booking').hidden=true">Done</button></div>`;
+  };
 }
 
 async function submitBooking(e) {
@@ -189,8 +277,13 @@ async function submitBooking(e) {
   const { data: bookingId, error } = await db.rpc('bbapp_create_booking', {
     p_shop: state.shop.id, p_chair: chair.id, p_service: state.service.id, p_date: state.date, p_time: state.time,
     p_name: f.get('name'), p_email: f.get('email'), p_phone: f.get('phone') || null,
+    p_notes: f.get('notes') || null,
+    p_preferences: f.get('preferences') || null,
+    // A new client who leaves the box empty has nothing to save.
+    p_prefs_action: f.get('prefs_action') === 'set' && !String(f.get('preferences') || '').trim() && !state.savedPrefs ? 'keep' : (f.get('prefs_action') || 'keep'),
   });
   if (error) { msg.textContent = error.message; return renderSlots(); }
+  BBtrack.event('booking_complete', { shop_id: state.shop.id });
   // "We have your booking" email; fire and forget so a mail hiccup never blocks the booking.
   fetch(`${cfg.supabaseUrl}/functions/v1/bbapp-email`, {
     method: 'POST',
@@ -201,9 +294,15 @@ async function submitBooking(e) {
   const when = new Date(y, mo - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   document.querySelector('#booking .sheet').innerHTML =
     `<h3>You're booked in ✂️</h3><p>${esc(state.service.name)} with ${esc(chair.name || 'one of our barbers')} at ${esc(state.shop.name)}, ${when} at ${state.time}.</p>
+     <p class="small">We'll send a reminder to your <a id="my-link" href="my.html">My booking</a> page 30 minutes before.</p>
      <p class="small">Want to pay now, add a product to collect, or leave a tip?</p>
      <div class="inline"><button class="btn" id="pay-cut">Pay now &amp; add products</button>
      <button class="btn ghost" onclick="document.getElementById('booking').hidden=true">Pay in the shop</button></div>`;
+  db.rpc('bbapp_manage_token', { p_booking: bookingId }).then(({ data: tok }) => {
+    if (!tok) return;
+    try { localStorage.setItem('bbapp-my-token', tok); } catch {}
+    const a = document.getElementById('my-link'); if (a) a.href = `my.html?t=${tok}`;
+  });
   document.getElementById('pay-cut').onclick = () => window.BBapp.openShop?.(state.shop.id, {
     id: bookingId, service_name: state.service.name, price_pence: state.service.price_pence,
     guest_name: f.get('name'), guest_email: f.get('email'), guest_phone: f.get('phone') || '',

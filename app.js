@@ -31,6 +31,7 @@ async function findBarber() {
   try {
     const shops = await BBapp.nearestShops(value);
     msg.textContent = `Barbers nearest ${value}`;
+    shops.forEach(s => BBtrack.event('shop_search', { shop_id: s.id }));
     list.innerHTML = shops.map(s => `
       <div class="shop">
         <div><b>${s.name}</b><span>${s.address} · ${s.postcode}</span></div>
@@ -56,6 +57,7 @@ try { if (localStorage.getItem('consent')) banner.classList.add('hidden'); } cat
 banner.querySelectorAll('[data-consent]').forEach(btn => btn.addEventListener('click', () => {
   try { localStorage.setItem('consent', btn.dataset.consent); } catch {}
   banner.classList.add('hidden');
+  BBtrack.consent(btn.dataset.consent);
 }));
 
 document.getElementById('vat-toggle').addEventListener('change', renderPrices);

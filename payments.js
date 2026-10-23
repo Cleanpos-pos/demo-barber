@@ -248,7 +248,7 @@
     bookingMoved: { label: 'Booking moved', subject: 'Your booking at {{shopName}} has moved', body: 'Hi {{guestName}},\n\nAs requested, your booking at {{shopName}} has moved to:\n\n{{serviceName}} with {{barberName}}\n{{bookingDate}} at {{bookingTime}}\n\nAny problems, reply to this email or call {{shopPhone}}.\n\n{{shopName}}' },
     bookingCancelled: { label: 'Booking cancelled', subject: 'Your booking at {{shopName}} has been cancelled', body: 'Hi {{guestName}},\n\nYour booking for {{serviceName}} on {{bookingDate}} at {{bookingTime}} has been cancelled.\n\nYou can book again any time. Sorry for any inconvenience.\n\n{{shopName}}' },
   };
-  const PLACEHOLDERS = ['{{guestName}}', '{{serviceName}}', '{{barberName}}', '{{bookingDate}}', '{{bookingTime}}', '{{shopName}}', '{{shopAddress}}', '{{shopPhone}}', '{{notes}}'];
+  const PLACEHOLDERS = ['{{manageLink}}', '{{guestName}}', '{{serviceName}}', '{{barberName}}', '{{bookingDate}}', '{{bookingTime}}', '{{shopName}}', '{{shopAddress}}', '{{shopPhone}}', '{{notes}}'];
 
   BBdash.tab('integrations', async panel => {
     const shop = BBdash.shop;
