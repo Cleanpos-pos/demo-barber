@@ -34,6 +34,7 @@
           <p id="book-msg" class="small" role="status"></p>
         </form>
         <div id="results" class="results light"></div>
+        <p class="recommend">Love your barber but they're not on BBapp? <button type="button" class="linkish" data-recommend>Recommend a barber</button></p>
 
         <div class="app-cta">
           <div id="qr" class="qr" aria-label="QR code to open this page on your phone"></div>
@@ -84,7 +85,7 @@
         try {
           const shops = await BBapp.nearestShops(pc);
           shops.slice(0, 8).forEach(s => BBtrack.event('shop_search', { shop_id: s.id }));
-          msg.textContent = shops.length ? `Barbers nearest ${pc}` : 'No barbers on BBapp near you yet.';
+          msg.innerHTML = shops.length ? `Barbers nearest ${esc(pc)}` : 'No barbers on BBapp near you yet. <button type="button" class="linkish" data-recommend>Recommend yours</button>';
           list.innerHTML = shops.slice(0, 8).map(s => `
             <div class="shop">
               <div><b>${esc(s.name)}</b><span>${esc(s.address || '')} · ${esc(s.postcode)}</span></div>
@@ -94,6 +95,39 @@
             </div>`).join('');
         } catch (err) { msg.textContent = err.message; }
       };
+      // Recommend a barber: saved to BBapp-recommendations so we can invite them.
+      function recommend() {
+        const m = document.getElementById('booking');
+        m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rec-h">
+          <button class="close" aria-label="Close" data-close>×</button>
+          <h3 id="rec-h">Recommend a barber</h3>
+          <p class="small">Tell us about a barber you love and we'll invite them to take bookings on BBapp.</p>
+          <form class="stack" id="rec-form">
+            <label>Barbershop name<input name="shop_name" required maxlength="120"></label>
+            <label>Barber's name (optional)<input name="barber_name" maxlength="80"></label>
+            <label>Town or postcode<input name="town" required maxlength="80" value="${esc(document.getElementById('pc').value)}"></label>
+            <label>Shop phone, Instagram or website (optional)<input name="shop_contact" maxlength="120"></label>
+            <label>Why do you rate them? (optional)<textarea name="why" maxlength="500" rows="3"></textarea></label>
+            <label>Your name (optional)<input name="your_name" maxlength="80" autocomplete="name"></label>
+            <label>Your email (optional, so we can tell you when they join)<input name="your_email" type="email" maxlength="120" autocomplete="email"></label>
+            <button class="btn">Send recommendation</button>
+            <p class="small" id="rec-msg" role="status"></p>
+          </form></div>`;
+        m.hidden = false;
+        m.querySelector('[data-close]').onclick = () => { m.hidden = true; };
+        m.querySelector('#rec-form').onsubmit = async e => {
+          e.preventDefault();
+          const f = Object.fromEntries(new FormData(e.target));
+          for (const k in f) f[k] = f[k].trim() || null;
+          const { error } = await BBapp.db.from('BBapp-recommendations').insert(f);
+          if (error) { m.querySelector('#rec-msg').textContent = "Sorry, that didn't send. Please try again."; return; }
+          m.querySelector('.sheet').innerHTML = `<button class="close" aria-label="Close" data-close>×</button>
+            <h3>Thanks, we'll get in touch with ${esc(f.shop_name)}</h3><p>Your barber could be taking bookings on BBapp soon.</p>`;
+          m.querySelector('[data-close]').onclick = () => { m.hidden = true; };
+        };
+      }
+      document.addEventListener('click', e => { if (e.target.closest('[data-recommend]')) recommend(); });
+
       list.onclick = e => {
         const id = e.target.closest('[data-shop]')?.dataset.shop; if (id) BBapp.openBooking(id);
         const store = e.target.closest('[data-store]')?.dataset.store; if (store) BBapp.openShop(store);

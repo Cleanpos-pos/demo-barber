@@ -303,3 +303,6 @@ fieldset { border:0; padding:0; margin:0; } legend { font-weight:600; margin-bot
 .about li { background:var(--card, #fff); border-radius:14px; padding:16px 18px; }
 .about li b { display:block; font-size:17px; margin-bottom:4px; }
 @media (max-width:800px) { .about { grid-template-columns:1fr; padding:44px 16px; } }
+
+/* Recommend a barber */
+.recommend { margin:14px 0 0; font-size:15px; }
