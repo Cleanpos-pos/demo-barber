@@ -28,21 +28,32 @@
       return m.querySelector('.sheet');
     },
     closeSheet() { $('sheet').hidden = true; },
-    // Guest email via the bbapp-email edge function (Brevo), signed as the owner.
-    async sendEmail(bookingId, templateId) {
+    // Calls a BBapp edge function signed as the owner.
+    async callFn(name, body) {
       const { data: { session } } = await db.auth.getSession();
       try {
-        const res = await fetch(`${window.BBAPP_CONFIG.supabaseUrl}/functions/v1/bbapp-email`, {
+        const res = await fetch(`${window.BBAPP_CONFIG.supabaseUrl}/functions/v1/${name}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: window.BBAPP_CONFIG.supabaseKey, Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ booking_id: bookingId, template_id: templateId }),
+          body: JSON.stringify(body),
         });
         return await res.json();
-      } catch { return { emailSent: false, emailError: 'network' }; }
+      } catch { return {}; }
+    },
+    // Guest email (bbapp-email, Brevo) and SMS (bbapp-sms, Plivo) for the same event.
+    async sendEmail(bookingId, templateId) {
+      const [email, sms] = await Promise.all([
+        BBdash.callFn('bbapp-email', { booking_id: bookingId, template_id: templateId }),
+        BBdash.callFn('bbapp-sms', { booking_id: bookingId, kind: templateId }),
+      ]);
+      return { ...email, ...sms };
     },
     emailNote(r) {
-      if (r?.emailSent) return ' · email sent';
-      return { no_guest_email: ' · no email on file', email_not_configured: ' · email not set up yet' }[r?.emailError] || ' · email failed';
+      const email = r?.emailSent ? ' · email sent'
+        : { no_guest_email: ' · no email on file', email_not_configured: ' · email not set up yet' }[r?.emailError] || ' · email failed';
+      const sms = r?.smsSent ? ' · text sent'
+        : { no_phone: '', sms_not_configured: ' · texts not set up yet' }[r?.smsError] ?? ' · text failed';
+      return email + sms;
     },
   };
 

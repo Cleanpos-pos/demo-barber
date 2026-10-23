@@ -290,6 +290,12 @@ async function submitBooking(e) {
     headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseKey },
     body: JSON.stringify({ booking_id: bookingId, template_id: 'bookingReceived' }),
   }).catch(() => {});
+  // Text with a link to the 60-day booking page, if they gave a mobile number.
+  if (f.get('phone')) fetch(`${cfg.supabaseUrl}/functions/v1/bbapp-sms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseKey },
+    body: JSON.stringify({ booking_id: bookingId, kind: 'bookingReceived' }),
+  }).catch(() => {});
   const [y, mo, d] = state.date.split('-').map(Number);
   const when = new Date(y, mo - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   document.querySelector('#booking .sheet').innerHTML =

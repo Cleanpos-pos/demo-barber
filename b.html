@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Booking | BBapp</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav"><a class="logo" href="book.html">BB<span>app</span></a></header>
+  <main class="my-wrap" id="page"><p class="small">Loading your booking…</p></main>
+  <div id="booking" class="modal" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="booking.js"></script>
+  <script src="possopay.js"></script>
+  <script src="shop.js"></script>
+  <script>
+    // Landing page for SMS links (b.html?c=<code>). The page row lives 60 days,
+    // then the nightly purge deletes it and this link stops working.
+    (async () => {
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+      const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+      const el = document.getElementById('page');
+      const code = new URLSearchParams(location.search).get('c') || '';
+      const { data } = /^[A-Za-z0-9]{10}$/.test(code) ? await BBapp.db.rpc('bbapp_sms_page', { p_code: code }) : { data: null };
+      if (!data) {
+        el.innerHTML = `<h1>This link has expired</h1><p>Booking links from our texts last 60 days. You can still <a href="book.html">book again</a> or check your booking email.</p>`;
+        return;
+      }
+      const { booking: b, shop: s } = data;
+      const [y, m, d] = b.date.split('-').map(Number);
+      const when = new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const STATUS = { pending: 'Requested', confirmed: 'Confirmed', seated: 'In the chair', completed: 'Completed', cancelled: 'Cancelled', no_show: 'Missed' };
+      const live = ['pending', 'confirmed'].includes(b.status);
+      const addr = [s.address, s.postcode].filter(Boolean).join(', ');
+      el.innerHTML = `
+        <p class="eyebrow">${esc(s.name)}</p>
+        <h1>Hi ${esc((b.guest_name || '').split(' ')[0])}, here's your booking</h1>
+        <div class="card stack">
+          <span class="tag ${esc(b.status)}">${STATUS[b.status] || esc(b.status)}</span>
+          <p><b>${esc(b.service_name || 'Appointment')}</b>${b.barber ? ' with ' + esc(b.barber) : ''}<br>
+             ${when} at <b>${esc(b.time)}</b> · ${b.duration_minutes} min${b.price_pence != null ? ' · ' + gbp.format(b.price_pence / 100) : ''}</p>
+          ${b.notes ? `<p class="small">Your notes: ${esc(b.notes)}</p>` : ''}
+          <p class="small">${esc(s.name)}${addr ? ' · <a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.name + ' ' + addr) + '" target="_blank" rel="noopener">' + esc(addr) + '</a>' : ''}${s.phone ? ' · <a href="tel:' + esc(s.phone) + '">' + esc(s.phone) + '</a>' : ''}</p>
+        </div>
+        ${live ? `
+        <div class="card stack" style="margin-top:16px">
+          <h2>Pre-order from the shop</h2>
+          <p>Add products to collect at your appointment, and pay for them (and your cut) now if you like.</p>
+          <div class="inline"><button class="btn" id="preorder">Shop &amp; pay</button>
+          ${b.manage_token ? `<a class="btn ghost" href="my.html?t=${encodeURIComponent(b.manage_token)}">Change or cancel</a>` : ''}</div>
+        </div>` : `<p><a class="btn" href="book.html">Book again</a></p>`}
+        <p class="small">This page is available until ${new Date(data.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>`;
+      document.getElementById('preorder')?.addEventListener('click', () => BBapp.openShop(s.id, {
+        id: b.id, service_name: b.service_name, price_pence: b.price_pence,
+        guest_name: b.guest_name, guest_email: b.guest_email || '', guest_phone: b.guest_phone || '',
+      }));
+    })();
+  </script>
+</body>
+</html>

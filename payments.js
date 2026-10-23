@@ -202,11 +202,20 @@
       <p>${esc(l.description)} · <b>${gbp.format(l.amount_pence / 100)}</b></p>
       <input class="link-box" readonly value="${esc(url)}" aria-label="Pay link">
       <div class="chips">
+        ${l.customer_phone ? '<button data-sms>Send text now</button>' : ''}
         <button data-copy>Copy link</button>
         <a class="chip" href="https://wa.me/${phone}?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>
         <a class="chip" href="sms:${esc(l.customer_phone || '')}?&body=${encodeURIComponent(text)}">Text message</a>
         <a class="chip" href="mailto:${esc(l.customer_email || '')}?subject=${encodeURIComponent('Pay ' + BBdash.shop.name)}&body=${encodeURIComponent(text)}">Email</a>
       </div>`);
+    const smsBtn = sheet.querySelector('[data-sms]');
+    if (smsBtn) smsBtn.onclick = async () => {
+      smsBtn.disabled = true;
+      const r = await BBdash.callFn('bbapp-sms', { pay_link_id: l.id, kind: 'payLink' });
+      smsBtn.disabled = false;
+      if (r.smsSent) return toast(`Text sent to ${l.customer_phone}`);
+      toast({ sms_not_configured: 'Texts are not set up yet (Plivo)', no_phone: 'That phone number does not look right' }[r.smsError] || 'Text failed to send', true);
+    };
     sheet.querySelector('[data-copy]').onclick = async () => {
       try { await navigator.clipboard.writeText(url); toast('Link copied'); }
       catch { sheet.querySelector('.link-box').select(); toast('Press Ctrl+C to copy'); }
